@@ -1,0 +1,3 @@
+([('ip_multi-tool_v2',
+   '/Users/flurin/testing/dist/ip_multi-tool_v2',
+   'EXECUTABLE')],)
