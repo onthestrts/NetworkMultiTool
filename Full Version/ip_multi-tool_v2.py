@@ -16,10 +16,10 @@ import hashlib
 os.environ['ADMIN_PASSWORD_HASH'] = hashlib.sha256(b'testtest').hexdigest()
 
 # Creator Information
-CREATOR_NAME = "Flurin Kärcher"
+CREATOR_NAME = "ONTHESTRTS
 CREATION_DATE = datetime.datetime.now().strftime("%Y-%m-%d")
-EMAIL = "fkaercher@baggenstos.ch"
-VERSION = 7.2  # Incremented version number for a minor change
+EMAIL = "fullframedx@gmail.com"
+VERSION = 1  # Incremented version number for a minor change
 
 # Program 1 (IP Address Analyzer) Functions
 def extract_ips(text):
