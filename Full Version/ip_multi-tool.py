@@ -11,17 +11,74 @@ import socket
 import threading
 import os
 import hashlib
+from collections import Counter
 
 # Setting up environment variables for password
-os.environ['ADMIN_PASSWORD_HASH'] = hashlib.sha256(b'testtest').hexdigest()
+os.environ['ADMIN_PASSWORD_HASH'] = hashlib.sha256(b'your_password').hexdigest()
 
 # Creator Information
-CREATOR_NAME = "ONTHESTRTS
+CREATOR_NAME = "ONTHESTRTS"
 CREATION_DATE = datetime.datetime.now().strftime("%Y-%m-%d")
-EMAIL = "fullframedx@gmail.com"
-VERSION = 1  # Incremented version number for a minor change
+EMAIL = "info@onthestrts.ch"
+VERSION = 1.1  # Incremented version number for a minor change
 
-# Program 1 (IP Address Analyzer) Functions
+# CSV Converter Function with Combined IP Isolation and Filtering
+def csv_to_textile(csv_file_path, isolate_ip=False):
+    try:
+        with open(csv_file_path, 'r', newline='', encoding='utf-8') as csv_file:
+            reader = csv.reader(csv_file)
+            rows = list(reader)
+
+            if not rows:
+                messagebox.showinfo("Info", "The CSV file is empty.")
+                return ""
+
+            ip_addresses = []
+            time_pattern = r'\b\d{1,2}\.\d{1,2}\.\d{4}, \d{1,2}:\d{2}:\d{2}\.\d{3}\b'
+
+            # Process rows to extract IP addresses if isolating
+            for row in rows[1:]:
+                for value in row:
+                    # Skip values that match common time formats
+                    if re.match(time_pattern, value):
+                        continue
+                    ipv4_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+                    ipv6_pattern = r'\b(?:[a-fA-F0-9:]+:+)+[a-fA-F0-9]+\b'
+                    if re.match(ipv4_pattern, value) or re.match(ipv6_pattern, value):
+                        ip_addresses.append(value)
+            
+            if isolate_ip:
+                return "\n".join(ip_addresses)
+
+            # If not isolating, convert entire CSV to Textile
+            textile_content = []
+            header_textile = '|_. ' + ' |_. '.join(rows[0]) + ' |'
+            textile_content.append(header_textile)
+
+            for row in rows[1:]:
+                row_textile = '| ' + ' | '.join(row) + ' |'
+                textile_content.append(row_textile)
+
+        return "\n".join(textile_content)
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {str(e)}")
+        return ""
+
+# Function to handle file selection and conversion
+def convert_csv(isolate_ip=False):
+    csv_file_path = filedialog.askopenfilename(title="Select CSV File", filetypes=[("CSV files", "*.csv")])
+    if not csv_file_path:
+        return
+
+    textile_content = csv_to_textile(csv_file_path, isolate_ip)
+    if textile_content:
+        result_text_area_csv.config(state=tk.NORMAL)
+        result_text_area_csv.delete("1.0", tk.END)
+        result_text_area_csv.insert(tk.END, textile_content)
+        result_text_area_csv.config(state=tk.DISABLED)
+        messagebox.showinfo("Success", "CSV file has been successfully processed.")
+
+# IP Address Analyzer Functions
 def extract_ips(text):
     ipv4_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
     ipv6_pattern = r'\b(?:[a-fA-F0-9:]+:+)+[a-fA-F0-9]+\b'
@@ -63,20 +120,11 @@ def lookup_ip(ip):
     except Exception as e:
         return {'error': str(e)}
 
-def nslookup(ip):
-    try:
-        result = subprocess.run(["nslookup", ip], capture_output=True, text=True)
-        return result.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        return f"NSLookup failed: {str(e)}"
-    except Exception as e:
-        return f"Unexpected error: {str(e)}"
-
-def create_textile_table(ip_data):
-    header = "| IP Address | ASN | AS Name | Category | Country | Region | City | ZIP/Postal Code | Latitude | Longitude | ISP |\n"
+def create_textile_table(ip_data, ip_count):
+    header = "| IP Address | ASN | AS Name | Category | Country | Region | City | ZIP/Postal Code | Latitude | Longitude | ISP | Login Count with this IP |\n"
     rows = ""
     for ip, data in ip_data.items():
-        rows += "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n".format(
+        rows += "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n".format(
             ip,
             data.get('asn', 'N/A'),
             data.get('asn_name', 'N/A'),
@@ -87,16 +135,19 @@ def create_textile_table(ip_data):
             data.get('postal_code', 'N/A'),
             data.get('latitude', 'N/A'),
             data.get('longitude', 'N/A'),
-            data.get('isp', 'N/A')
+            data.get('isp', 'N/A'),
+            ip_count[ip]
         )
     return header + rows
 
 def run_analysis(input_text):
     ips = extract_ips(input_text)
+    ip_count = Counter(ips)  # Count occurrences of each IP
+    unique_ips = list(ip_count.keys())
     ip_data = {}
-    for ip in ips:
+    for ip in unique_ips:
         ip_data[ip] = lookup_ip(ip)
-    textile_table = create_textile_table(ip_data)
+    textile_table = create_textile_table(ip_data, ip_count)
     return textile_table, ip_data
 
 def display_results():
@@ -138,7 +189,7 @@ def export_csv(ip_data):
         if filepath:
             with open(filepath, mode='w', newline='') as file:
                 writer = csv.writer(file)
-                writer.writerow(["IP Address", "ASN", "AS Name", "Category", "Country", "Region", "City", "ZIP/Postal Code", "Latitude", "Longitude", "ISP"])
+                writer.writerow(["IP Address", "ASN", "AS Name", "Category", "Country", "Region", "City", "ZIP/Postal Code", "Latitude", "Longitude", "ISP", "Login Count with this IP"])
                 for ip, data in ip_data.items():
                     writer.writerow([
                         ip,
@@ -151,11 +202,12 @@ def export_csv(ip_data):
                         data.get('postal_code', 'N/A'),
                         data.get('latitude', 'N/A'),
                         data.get('longitude', 'N/A'),
-                        data.get('isp', 'N/A')
+                        data.get('isp', 'N/A'),
+                        ip_count[ip]
                     ])
             messagebox.showinfo("Export Complete", f"Data exported to {filepath}")
 
-# Program 2 (IP Scanner) Functions
+# IP Scanner Functions
 COMMON_PORTS = {
     21: 'FTP',
     22: 'SSH',
@@ -171,7 +223,6 @@ COMMON_PORTS = {
 
 def is_host_up(ip):
     try:
-        # Using socket to check if the host is reachable
         socket.gethostbyname(ip)
         return True
     except socket.error:
@@ -241,8 +292,6 @@ def show_about():
     close_button = tk.Button(about_window, text="Close", command=about_window.destroy, bg='#3c3f41', fg='white', bd=0, padx=10, pady=5)
     close_button.pack(pady=10)
 
-
-
 def admin_login():
     def verify_password():
         entered_password = password_entry.get()
@@ -288,6 +337,25 @@ root.minsize(800, 600)
 # Create the Notebook (tabs)
 notebook = ttk.Notebook(root)
 notebook.pack(expand=True, fill='both')
+
+# CSV Converter Tab
+csv_converter_tab = tk.Frame(notebook)
+notebook.add(csv_converter_tab, text="CSV Converter")
+
+# CSV Converter UI
+button_frame_csv = tk.Frame(csv_converter_tab, pady=10)
+button_frame_csv.pack()
+
+csv_button = tk.Button(button_frame_csv, text="Convert CSV to Textile", command=lambda: convert_csv())
+csv_button.pack(side=tk.LEFT, padx=5)
+
+isolate_ip_button = tk.Button(button_frame_csv, text="Isolate IPs", command=lambda: convert_csv(isolate_ip=True))
+isolate_ip_button.pack(side=tk.LEFT, padx=5)
+
+# Result Display for CSV Conversion
+result_text_area_csv = scrolledtext.ScrolledText(csv_converter_tab, wrap=tk.WORD, height=20, bg="white", fg="black", insertbackground="black")
+result_text_area_csv.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+result_text_area_csv.config(state=tk.DISABLED)
 
 # IP Address Analyzer Tab
 analyzer_tab = tk.Frame(notebook)
@@ -389,4 +457,3 @@ admin_button = tk.Button(root, text="Admin", command=admin_login)
 admin_button.pack(side=tk.RIGHT, padx=10, pady=5)
 
 root.mainloop()
-
