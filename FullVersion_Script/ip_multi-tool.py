@@ -17,9 +17,9 @@ from collections import Counter
 os.environ['ADMIN_PASSWORD_HASH'] = hashlib.sha256(b'your_password').hexdigest()
 
 # Creator Information
-CREATOR_NAME = "Flurin Kärcher"
+CREATOR_NAME = "ONTHESTRTS"
 CREATION_DATE = datetime.datetime.now().strftime("%Y-%m-%d")
-EMAIL = "fkaercher@baggenstos.ch"
+EMAIL = "info@onthestrts.ch"
 VERSION = 1.1  # Incremented version number for a minor change
 
 # CSV Converter Function with Combined IP Isolation and Filtering
